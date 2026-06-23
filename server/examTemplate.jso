@@ -1,0 +1,277 @@
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } = require("docx");
+
+// ========== دوال مساعدة لإنشاء خلايا وعناوين ==========
+const border = { style: BorderStyle.SINGLE, size: 4, color: "000000" }; // حدود واضحة ومناسبة للطباعة
+const cellBorders = { top: border, bottom: border, left: border, right: border };
+const arabicFont = "Times New Roman";
+const mainColor = "1F4E79";
+
+// دالة إنشاء خلية عادية مع دعم اتجاه اليمين لليسار
+function createCell(text, width, alignment = AlignmentType.RIGHT, bold = false, size = 22, font = arabicFont) {
+    return new TableCell({
+        borders: cellBorders,
+        width: { size: width, type: WidthType.PERCENTAGE },
+        children: [new Paragraph({
+            alignment: alignment,
+            bidirectional: true, // تفعيل اتجاه النص العربي RTL
+            children: [new TextRun({ text: text, bold: bold, size: size, font: font })]
+        })]
+    });
+}
+
+// دالة إنشاء خلية مدمجة الأعمدة
+function createMergedCell(text, colSpan, alignment = AlignmentType.RIGHT, bold = false, size = 22) {
+    return new TableCell({
+        borders: cellBorders,
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        columnSpan: colSpan,
+        children: [new Paragraph({
+            alignment: alignment,
+            bidirectional: true,
+            children: [new TextRun({ text: text, bold: bold, size: size, font: arabicFont })]
+        })]
+    });
+}
+
+// دالة إنشاء عنوان رئيسي للسؤال
+function createHeading(text, size = 26) {
+    return new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        bidirectional: true,
+        spacing: { before: 300, after: 150 },
+        children: [new TextRun({ text: text, bold: true, size: size, font: arabicFont, color: mainColor })]
+    });
+}
+
+function createExamDoc(data) {
+    let result;
+    try {
+        if (typeof data === "string") {
+            result = JSON.parse(data.replace(/```json|
+```/g, "").trim());
+        } else {
+            result = data;
+        }
+    } catch (e) {
+        return null;
+    }
+
+    if (!result || !result.title) return null;
+
+    const children = [];
+
+    // ========== رأس الصفحة الرسمي للمملكة ==========
+    children.push(
+        new Paragraph({ alignment: AlignmentType.CENTER, bidirectional: true, children: [new TextRun({ text: "﷽", bold: true, size: 24, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, children: [new TextRun({ text: "المملكة العربية السعودية", bold: true, size: 22, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, children: [new TextRun({ text: "وزارة التعليم", bold: true, size: 22, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, children: [new TextRun({ text: `الإدارة العامة للتعليم بمحافظة/منطقة: ________________`, size: 20, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, children: [new TextRun({ text: `مكتب التعليم بـ: ________________`, size: 20, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, spacing: { after: 200 }, children: [new TextRun({ text: `مدرسة: ________________`, size: 20, font: arabicFont })] }),
+        
+        new Paragraph({ alignment: AlignmentType.CENTER, bidirectional: true, spacing: { before: 100, after: 100 }, children: [new TextRun({ text: `اختبار مادة: ${result.title || "___________"}`, bold: true, size: 26, font: arabicFont, color: mainColor })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, bidirectional: true, spacing: { after: 100 }, children: [new TextRun({ text: `للصف: ( ${result.grade || "______"} )        الفصل الدراسي: ( ${result.term || "______"} )`, bold: true, size: 22, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, bidirectional: true, spacing: { after: 200 }, children: [new TextRun({ text: `للعام الدراسي: 1446 هـ        نوع الاختبار: ( ${result.exam_type || "نهائي"} )`, bold: true, size: 22, font: arabicFont })] }),
+        
+        // بيانات الطالب
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, spacing: { after: 100 }, children: [new TextRun({ text: "اسم الطالب/ة : ............................................................................  الصف : .........................", bold: true, size: 22, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, spacing: { after: 300 }, children: [new TextRun({ text: "رقم الجلوس : .........................                                              التاريخ : ..... / ..... / 1446هـ", bold: true, size: 22, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [new TextRun({ text: "_________________________________________________________________________________", color: "CCCCCC" })] })
+    );
+
+    // ========== 1- اختيار من متعدد ==========
+    if (result.multiple_choice && result.multiple_choice.length > 0) {
+        children.push(
+            createHeading("السؤال الأول: اختر الإجابة الصحيحة مما يلي:")
+        );
+
+        for (const q of result.multiple_choice) {
+            const optKeys = q.options ? Object.keys(q.options) : [];
+            
+            // الصف الأول: نص السؤال كاملاً داخل جدول مستقل
+            const questionRow = new TableRow({
+                children: [createMergedCell(`${q.id}. ${q.question}`, 8, AlignmentType.RIGHT, true, 22)]
+            });
+
+            // الصف الثاني: 8 أعمدة (الرمز ثم خيار الإجابة)
+            const labels = ["أ", "ب", "ج", "د"];
+            const optionCells = [];
+            for (let i = 0; i < 4; i++) {
+                const key = optKeys[i] || labels[i];
+                const value = q.options ? (q.options[key] || "") : "";
+                
+                // إضافة رمز الخيار (أ، ب، ج، د) وعرضه 10% ثم خانة الخيار وعرضها 15%
+                optionCells.push(
+                    createCell(labels[i], 10, AlignmentType.CENTER, true, 20),
+                    createCell(value, 15, AlignmentType.RIGHT, false, 20)
+                );
+            }
+            const optionsRow = new TableRow({ children: optionCells });
+
+            children.push(
+                new Table({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    alignment: AlignmentType.CENTER,
+                    rows: [questionRow, optionsRow]
+                }),
+                new Paragraph({ spacing: { after: 150 }, children: [] })
+            );
+        }
+    }
+
+    // ========== 2- صواب وخطأ ==========
+    if (result.true_false && result.true_false.length > 0) {
+        children.push(
+            createHeading("السؤال الثاني: ضع علامة (✓) أمام العبارة الصحيحة وعلامة (✗) أمام العبارة الخاطئة:")
+        );
+
+        const tfRows = [];
+        // صف العنوان للجدول
+        tfRows.push(new TableRow({
+            children: [
+                createCell("المسلسل", 15, AlignmentType.CENTER, true),
+                createCell("فقرة السؤال", 65, AlignmentType.CENTER, true),
+                createCell("الإجابة (✓ / ✗)", 20, AlignmentType.CENTER, true)
+            ]
+        }));
+
+        for (const q of result.true_false) {
+            tfRows.push(new TableRow({
+                children: [
+                    createCell(String(q.id), 15, AlignmentType.CENTER, false),
+                    createCell(q.question, 65, AlignmentType.RIGHT, false),
+                    createCell("", 20, AlignmentType.CENTER, false) // خانة فارغة واضحة للكتابة والطباعة
+                ]
+            }));
+        }
+        children.push(
+            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, rows: tfRows }),
+            new Paragraph({ spacing: { after: 200 }, children: [] })
+        );
+    }
+
+    // ========== 3- صل العمود أ بما يناسبه من ب ==========
+    if (result.matching && result.matching.length > 0) {
+        children.push(
+            createHeading("السؤال الثالث: صل فقرات العمود (أ) بما يناسبها من العمود (ب):")
+        );
+
+        for (const q of result.matching) {
+            const matchRows = [];
+            // رأس الجدول المكون من 4 أعمدة
+            matchRows.push(new TableRow({
+                children: [
+                    createCell("المسلسل", 10, AlignmentType.CENTER, true, 20),
+                    createCell("العمود (أ)", 40, AlignmentType.CENTER, true, 20),
+                    createCell("الإجابة", 15, AlignmentType.CENTER, true, 20),
+                    createCell("العمود (ب)", 35, AlignmentType.CENTER, true, 20)
+                ]
+            }));
+
+            const colA = q.column_a || [];
+            const colB = q.column_b || [];
+            const maxLen = Math.max(colA.length, colB.length);
+            
+            for (let i = 0; i < maxLen; i++) {
+                matchRows.push(new TableRow({
+                    children: [
+                        createCell(String(i + 1), 10, AlignmentType.CENTER, false, 20),
+                        createCell(colA[i] || "", 40, AlignmentType.RIGHT, false, 20),
+                        createCell("", 15, AlignmentType.CENTER, false, 20), // عمود فارغ لكتابة رقم أو حرف الإجابة
+                        createCell(colB[i] || "", 35, AlignmentType.RIGHT, false, 20)
+                    ]
+                }));
+            }
+            children.push(
+                new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, rows: matchRows }),
+                new Paragraph({ spacing: { after: 200 }, children: [] })
+            );
+        }
+    }
+
+    // ========== 4- أكمل الفراغ ==========
+    if (result.fill_blank && result.fill_blank.length > 0) {
+        children.push(
+            createHeading("السؤال الرابع: أكمل الفراغات في الجمل التالية بما يناسبها:")
+        );
+
+        const fillRows = [];
+        fillRows.push(new TableRow({
+            children: [
+                createCell("المسلسل", 15, AlignmentType.CENTER, true),
+                createCell("فقرة السؤال", 85, AlignmentType.CENTER, true)
+            ]
+        }));
+        for (const q of result.fill_blank) {
+            fillRows.push(new TableRow({
+                children: [
+                    createCell(String(q.id), 15, AlignmentType.CENTER, false),
+                    createCell(q.question, 85, AlignmentType.RIGHT, false)
+                ]
+            }));
+        }
+        children.push(
+            new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, rows: fillRows }),
+            new Paragraph({ spacing: { after: 200 }, children: [] })
+        );
+    }
+
+    // ========== 5- الأسئلة المقالية ==========
+    if (result.essay && result.essay.length > 0) {
+        children.push(
+            createHeading("السؤال الخامس: أجب عن الأسئلة المقالية التالية:")
+        );
+
+        for (const q of result.essay) {
+            const essayRows = [
+                // صف السؤال في الأعلى
+                new TableRow({
+                    children: [createMergedCell(`${q.id}. ${q.question}`, 1, AlignmentType.RIGHT, true, 22)]
+                }),
+                // ثلاثة أسطر منقّطة ومستقلة للإجابة ومناسبة للخط اليدوي
+                new TableRow({
+                    children: [createMergedCell("الإجابة: .....................................................................................................................................", 1, AlignmentType.RIGHT, false, 20)]
+                }),
+                new TableRow({
+                    children: [createMergedCell(".............................................................................................................................................", 1, AlignmentType.RIGHT, false, 20)]
+                }),
+                new TableRow({
+                    children: [createMergedCell(".............................................................................................................................................", 1, AlignmentType.RIGHT, false, 20)]
+                })
+            ];
+            children.push(
+                new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, rows: essayRows }),
+                new Paragraph({ spacing: { after: 200 }, children: [] })
+            );
+        }
+    }
+
+    // ========== 6- تذييل الاختبار الخاتم ==========
+    children.push(
+        new Paragraph({ spacing: { before: 400, after: 200 }, children: [new TextRun({ text: "_________________________________________________________________________________", color: "CCCCCC" })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, bidirectional: true, spacing: { before: 200, after: 300 }, children: [new TextRun({ text: "انتهت الأسئلة مع تمنياتي لكم بالتوفيق والنجاح ،،،", bold: true, size: 24, font: arabicFont, color: mainColor })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, spacing: { after: 100 }, children: [new TextRun({ text: "اسم المعلم /ة : .............................................", bold: true, size: 22, font: arabicFont })] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, bidirectional: true, spacing: { after: 100 }, children: [new TextRun({ text: "التوقيع : .............................................", bold: true, size: 22, font: arabicFont })] })
+    );
+
+    // ========== 7- إعداد المستند النهائي وهامش A4 ==========
+    const doc = new Document({
+        sections: [{
+            properties: {
+                page: {
+                    margin: {
+                        top: 1440,    // 1 بوصة هوامش معيارية للطباعة
+                        bottom: 1440,
+                        left: 1440,
+                        right: 1440
+                    }
+                }
+            },
+            children: children
+        }]
+    });
+
+    return doc;
+}
+
+module.exports = { createExamDoc };

@@ -432,5 +432,8 @@ app.post("/download-word", (req, res) => {
 // بدء الخادم
 // =======================
 app.use(express.static(path.join(__dirname, "../dist")));
-app.get("(.*)", (req, res) => res.sendFile(path.join(__dirname, "../dist/index.html")));
-app.listen(3001, "0.0.0.0", () => console.log("Server running on port 3001"));
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "../dist/index.html"));
+});
+app.listen(3001, "0.0.0.0", () => console.log( "Server running on port 3001"));
+

@@ -191,11 +191,6 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
 // API: الحصول على المواد
 // =======================
 app.get("/subjects", (req, res) => {
-
-    console.log("SUBJECTS API HIT");
-    console.log("grade =", req.query.grade);
-    console.log("semester =", req.query.semester);
-
     const grade = req.query.grade || "";
     const semester = req.query.semester || "الفصل الأول";
     const fileName = getCurriculumFile(semester);
@@ -232,10 +227,6 @@ app.get("/subjects", (req, res) => {
 // API: الحصول على وحدات المادة
 // =======================
 app.get("/topics", (req, res) => {
-console.log("TOPICS API HIT");
-console.log("grade =", req.query.grade);
-console.log("subject =", req.query.subject);
-console.log("semester =", req.query.semester);
     const grade = req.query.grade || "";
     const subject = req.query.subject || "";
     const semester = req.query.semester || "الفصل الأول";
@@ -440,9 +431,5 @@ app.post("/download-word", (req, res) => {
 // =======================
 // بدء الخادم
 // =======================
-app.use(express.static(path.join(__dirname, "../dist")));
-app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "../dist/index.html"));
-});
-app.listen(3001, "0.0.0.0", () => console.log( "Server running on port 3001"));
-
+app.get("/", (req, res) => res.send("Server is working 🚀"));
+app.listen(3001, "0.0.0.0", () => console.log("Server running on port 3001"));

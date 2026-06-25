@@ -191,6 +191,11 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
 // API: الحصول على المواد
 // =======================
 app.get("/subjects", (req, res) => {
+
+    console.log("SUBJECTS API HIT");
+    console.log("grade =", req.query.grade);
+    console.log("semester =", req.query.semester);
+
     const grade = req.query.grade || "";
     const semester = req.query.semester || "الفصل الأول";
     const fileName = getCurriculumFile(semester);
@@ -227,6 +232,10 @@ app.get("/subjects", (req, res) => {
 // API: الحصول على وحدات المادة
 // =======================
 app.get("/topics", (req, res) => {
+console.log("TOPICS API HIT");
+console.log("grade =", req.query.grade);
+console.log("subject =", req.query.subject);
+console.log("semester =", req.query.semester);
     const grade = req.query.grade || "";
     const subject = req.query.subject || "";
     const semester = req.query.semester || "الفصل الأول";
